@@ -49,7 +49,7 @@ jobs:
           path: |
             ci_scripts/
 
-  general-info:
+  validate-input:
     runs-on: ubuntu-22.04
     needs: ci-scripts
     steps:
@@ -63,6 +63,14 @@ jobs:
           ls -alh ci_scripts
           chmod +x ci_scripts/gha.sh
           ls -alh ci_scripts
-      - name: Output workflow info
+      - name: Display workflow info
         run: |
           ./ci_scripts/gha.sh display_info
+        env:
+          INPUT_IS_RELEASE: ${{ inputs.is_release }}
+          INPUT_SHA: ${{ inputs.sha }}
+          INPUT_VERSION: ${{ inputs.version }}
+          INPUT_CXX_CHANGE: ${{ inputs.cxx_change }}
+      - name: Validate workflow info
+        run: |
+          ./ci_scripts/gha.sh validate_input ${{ github.workflow }}
