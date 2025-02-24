@@ -52,6 +52,11 @@ jobs:
   validate-input:
     runs-on: ubuntu-22.04
     needs: ci-scripts
+    env:
+      INPUT_IS_RELEASE: ${{ inputs.is_release }}
+      INPUT_SHA: ${{ inputs.sha }}
+      INPUT_VERSION: ${{ inputs.version }}
+      INPUT_CXX_CHANGE: ${{ inputs.cxx_change }}
     steps:
       - name: Download CI scripts
         uses: actions/download-artifact@v4
@@ -66,11 +71,6 @@ jobs:
       - name: Display workflow info
         run: |
           ./ci_scripts/gha.sh display_info
-        env:
-          INPUT_IS_RELEASE: ${{ inputs.is_release }}
-          INPUT_SHA: ${{ inputs.sha }}
-          INPUT_VERSION: ${{ inputs.version }}
-          INPUT_CXX_CHANGE: ${{ inputs.cxx_change }}
       - name: Validate workflow info
         run: |
           ./ci_scripts/gha.sh validate_input ${{ github.workflow }}
