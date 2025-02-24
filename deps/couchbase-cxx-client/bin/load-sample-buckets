@@ -1,0 +1,54 @@
+#!/usr/bin/env ruby
+
+#  Copyright 2020-2021 Couchbase, Inc.
+#
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
+
+require "timeout"
+require "set"
+
+require_relative "api"
+
+options = {
+  host: ENV.fetch("CB_HOST", ARGV[0] || "127.0.0.1"),
+  strict_encryption: ENV.fetch("CB_STRICT_ENCRYPTION", ARGV[1]).to_b,
+  username: ENV.fetch("CB_USERNAME", ARGV[2] || "Administrator"),
+  password: ENV.fetch("CB_PASSWORD", ARGV[3] || "password"),
+  verbose: ENV.fetch("CB_VERBOSE", true).to_b,
+  bucket: "travel-sample",
+  sample_buckets: Set.new,
+}
+options[:sample_buckets] << "beer-sample" if ENV.fetch("CB_BEER_SAMPLE", false).to_b
+options[:sample_buckets] << "travel-sample" if ENV.fetch("CB_TRAVEL_SAMPLE", false).to_b
+options[:sample_buckets] |= ARGV[4..-1]
+return if options[:sample_buckets].empty?
+
+p options: options
+
+management_api =
+  begin
+    API.new(options.merge(port: options[:strict_encryption] ? 18091 : 8091))
+  rescue => ex
+    puts "#{ex}, sleep for 1 second and retry"
+    sleep(1)
+    retry
+  end
+
+expected_counts = {
+  "travel-sample" => 30_000,
+  "beer-sample" => 7_000,
+}
+
+options[:sample_buckets].each do |bucket|
+  ensure_sample_bucket_loaded(management_api, expected_counts[bucket], options.merge(bucket: bucket))
+end

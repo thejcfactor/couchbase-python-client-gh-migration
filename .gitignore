@@ -1,0 +1,28 @@
+*.so
+*.dylib*.*
+*.dll
+*.idea
+__pycache__/
+cmake-build-*/
+*.DS_Store
+
+# Distribution / packaging
+build/
+couchbase/_version.py
+couchbase/*.so
+couchbase/*.dylib*.*
+couchbase/*.dll
+couchbase/*.pyd
+deps/couchbase-cxx-cache/
+
+# Sphinx
+docs/_build/
+
+# VS Code
+.vscode/
+
+# tests
+tests/test_logs/
+CouchbaseMock*.jar
+gocaves*
+.pytest_cache/

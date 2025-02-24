@@ -1,0 +1,82 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+        args: [--allow-multiple-documents]
+      - id: check-added-large-files
+      - id: check-toml
+      - id: check-merge-conflict
+  - repo: https://github.com/pre-commit/mirrors-clang-format
+    rev: v18.1.6
+    hooks:
+      - id: clang-format
+        files: src/.*\.(cxx|hxx)$
+        exclude: ^deps/
+  - repo: https://github.com/hhatto/autopep8
+    rev: v2.2.0
+    hooks:
+      - id: autopep8
+        exclude: ^(deps/|src/)
+  - repo: https://github.com/pycqa/flake8
+    rev: 5.0.4
+    hooks:
+      - id: flake8
+        exclude: |
+          (?x)^(
+              deps/|
+              src/|
+              simple_acouchbase.py|
+              simple_couchbase.py|
+              simple_txcouchbase.py|
+              couchbase_kv_tests.py|
+              examples/
+          )
+        args:
+          [
+            --max-line-length=120,
+            --max-complexity=10
+          ]
+  - repo: https://github.com/PyCQA/isort
+    rev: 5.13.2
+    hooks:
+      - id: isort
+        exclude: |
+          (?x)^(
+              deps/|
+              src/|
+              examples/txcouchbase/
+          )
+        args:
+          [
+            "--multi-line 1",
+            "--force-grid-wrap 3",
+            "--use-parentheses True",
+            "--ensure-newline-before-comments True",
+            "--line-length 120",
+            "--order-by-type True"
+          ]
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.7.9
+    hooks:
+      - id: bandit
+        exclude: |
+          (?x)^(
+              deps/|
+              src/|
+              acouchbase/tests/|
+              txcouchbase/tests/|
+              couchbase/tests/|
+              tests/|
+              simple_acouchbase.py|
+              simple_couchbase.py|
+              simple_txcouchbase.py|
+              couchbase_kv_tests.py|
+              couchbase_version.py
+          )
+        args:
+          [
+              --quiet
+          ]

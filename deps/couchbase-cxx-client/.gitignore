@@ -1,0 +1,12 @@
+/out/
+/CPTCMakeBuild
+/build/
+/cmake-build-*/
+/cmake-build-report.tar.gz
+/.idea
+/.cache
+/.vs
+/.vscode
+/CMakeSettings.json
+/CppProperties.json
+/Testing
