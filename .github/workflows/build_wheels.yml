@@ -24,6 +24,7 @@ on:
         type: string
 
 env:
+  PROJECT_TYPE: "OPERATIONAL"
   DEFAULT_PYTHON: "3.9"
   PYTHON_VERSIONS: "3.9,3.10,3.11,3.12,3.13"
   X86_64_PLATFORMS: "manylinux2014,musllinux_1_1,macosx,win"
@@ -74,3 +75,29 @@ jobs:
       - name: Validate workflow info
         run: |
           ./ci_scripts/gha.sh validate_input ${{ github.workflow }}
+
+  lint:
+    runs-on: ubuntu-22.04
+    needs: ci-scripts
+    env:
+      INPUT_VERSION: ${{ inputs.version }}
+    steps:
+      - name: Download CI scripts
+        uses: actions/download-artifact@v4
+        with:
+          name: ci_scripts
+          path: ci_scripts
+      - name: Enable CI Scripts
+        run: |
+          chmod +x ci_scripts/gha.sh
+      - uses: actions/checkout@v4
+      - name: Setup Python ${{ env.DEFAULT_PYTHON }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.DEFAULT_PYTHON }}
+      - name: Confirm Python version
+        run: python -c "import sys; print(sys.version)"
+      - name: Execute linting
+        run: |
+          ls -alh
+          ./ci_scripts/gha.sh lint
