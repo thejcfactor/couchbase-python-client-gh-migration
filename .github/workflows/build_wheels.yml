@@ -28,7 +28,7 @@ env:
   PYTHON_VERSIONS: "3.9,3.10,3.11,3.12,3.13"
   X86_64_PLATFORMS: "manylinux2014,musllinux_1_1,macosx,win"
   ARM64_PLATFORMS: "manylinux2014,macosx"
-  CI_SCRIPTS_URL: "https://raw.githubusercontent.com/thejcfactor/ci_testing/refs/heads/main/ci/"
+  CI_SCRIPTS_URL: "https://raw.githubusercontent.com/thejcfactor/ci_testing/main/ci/"
 
 jobs:
   download-ci-scripts:
@@ -39,6 +39,8 @@ jobs:
           mkdir ci_scripts
           cd ci_scripts
           curl -o gha.sh ${CI_SCRIPTS_URL}/gha.sh
+          ls -alh
+          cat gha.sh
       - name: Upload CI scripts
         uses: actions/upload-artifact@v4
         with:
