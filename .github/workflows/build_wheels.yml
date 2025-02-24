@@ -28,11 +28,37 @@ env:
   PYTHON_VERSIONS: "3.9,3.10,3.11,3.12,3.13"
   X86_64_PLATFORMS: "manylinux2014,musllinux_1_1,macosx,win"
   ARM64_PLATFORMS: "manylinux2014,macosx"
+  CI_SCRIPTS_URL: "https://raw.githubusercontent.com/thejcfactor/ci_testing/refs/heads/main/ci/"
 
 jobs:
+  download-ci-scripts:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Download CI Scripts
+        run: |
+          mkdir ci_scripts
+          cd ci_scripts
+          curl -o gha.sh ${CI_SCRIPTS_URL}/gha.sh
+      - name: Upload CI scripts
+        uses: actions/upload-artifact@v4
+        with:
+          retention-days: 1
+          name: ci_scripts
+          path: |
+            ci_scripts/
+
   general-info:
     runs-on: ubuntu-22.04
     steps:
+      - name: Download CI scripts
+        uses: actions/download-artifact@v4
+        with:
+          name: ci_scripts
+          path: ci_scripts
+      - name: Verify Scripts
+        run: |
+          ls -alh ci_scripts
+          cat ci_scripts/gha.sh
       - name: Output workflow info
         run: |
           echo "Workflow Run ID=${{ github.run_id }}"
