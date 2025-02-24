@@ -28,10 +28,10 @@ env:
   PYTHON_VERSIONS: "3.9,3.10,3.11,3.12,3.13"
   X86_64_PLATFORMS: "manylinux2014,musllinux_1_1,macosx,win"
   ARM64_PLATFORMS: "manylinux2014,macosx"
-  CI_SCRIPTS_URL: "https://raw.githubusercontent.com/thejcfactor/ci_testing/main/ci/"
+  CI_SCRIPTS_URL: "https://raw.githubusercontent.com/thejcfactor/ci_testing/main/ci"
 
 jobs:
-  download-ci-scripts:
+  ci-scripts:
     runs-on: ubuntu-22.04
     steps:
       - name: Download CI Scripts
@@ -51,6 +51,7 @@ jobs:
 
   general-info:
     runs-on: ubuntu-22.04
+    needs: ci-scripts
     steps:
       - name: Download CI scripts
         uses: actions/download-artifact@v4
