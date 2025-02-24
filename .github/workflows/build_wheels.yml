@@ -61,15 +61,8 @@ jobs:
       - name: Verify Scripts
         run: |
           ls -alh ci_scripts
-          cat ci_scripts/gha.sh
+          chmod +x ci_scripts/gha.sh
+          ls -alh ci_scripts
       - name: Output workflow info
         run: |
-          echo "Workflow Run ID=${{ github.run_id }}"
-          echo "is_release=${{ inputs.is_release }}"
-          echo "SHA=${{ inputs.sha }}"
-          echo "version=${{ inputs.version }}"
-          echo "cxx_change=${{ inputs.cxx_change }}"
-          echo "DEFAULT_PYTHON=${{ env.DEFAULT_PYTHON }}"
-          echo "PYTHON_VERSIONS=${{ env.PYTHON_VERSIONS }}"
-          echo "X86_64_PLATFORMS=${{ env.X86_64_PLATFORMS }}"
-          echo "ARM64_PLATFORMS=${{ env.ARM64_PLATFORMS }}"
+          ./ci_scripts/gha.sh display_info
