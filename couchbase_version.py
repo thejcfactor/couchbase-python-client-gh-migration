@@ -61,7 +61,7 @@ class VersionInfo(object):
             self.ver_extra = re.sub(r'^dp', 'a', self.ver_extra, count=1)
             self.ver_extra = re.sub(r'^alpha', 'a', self.ver_extra, count=1)
             self.ver_extra = re.sub(r'^beta', 'b', self.ver_extra, count=1)
-            m = re.search(r'^([ab]|dev|rc|post)(\d+)?', self.ver_extra)
+            m = re.search(r'^([ab]|dev|rc|post)(\.{0,1}\d+)?', self.ver_extra)
             if m.group(1) in ["dev", "post"]:
                 self.ver_extra = "." + self.ver_extra
             if m.group(2) is None:
@@ -150,6 +150,12 @@ def gen_version(do_write=True, txt=None):
 
     if txt is None:
         txt = get_git_describe()
+
+    t = txt.rsplit('-', 2)
+    if len(t) != 3:
+        only_sha = re.match('[a-z0-9]+', txt)
+        if only_sha is not None and only_sha.group():
+            txt = f'0.0.1-0-{txt}'
 
     try:
         info = VersionInfo(txt)
