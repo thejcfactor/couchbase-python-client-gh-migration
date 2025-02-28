@@ -148,6 +148,14 @@ jobs:
       - name: Confirm Python version
         run: python -c "import sys; print(sys.version)"
       - name: Create sdist
+        id: create_sdist
         run: |
           ./ci_scripts/gha.sh sdist
-          echo "SDIST_NAME=$SDIST_NAME"
+          exit_code=0
+          sdist_name=$(./ci_scripts/gha.sh get_sdist_name) || exit_code=$?
+          if [ $exit_code -ne 0 ]; then
+            echo "Failed to obtain sdist name."
+            exit 1
+          fi
+          echo "SDIST_NAME=$sdist_name"
+          echo "sdist_name=$sdist_name" >> "$GITHUB_OUTPUT"
