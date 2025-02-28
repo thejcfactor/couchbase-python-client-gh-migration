@@ -148,4 +148,6 @@ jobs:
       - name: Confirm Python version
         run: python -c "import sys; print(sys.version)"
       - name: Create sdist
-        run: ./ci_scripts/gha.sh sdist
+        run: |
+          ./ci_scripts/gha.sh sdist
+          echo "SDIST_NAME=$SDIST_NAME"
