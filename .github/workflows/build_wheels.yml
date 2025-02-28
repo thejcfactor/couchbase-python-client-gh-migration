@@ -140,7 +140,7 @@ jobs:
           path: ci_scripts
       - name: Enable CI Scripts
         run: |
-          chmod +x ci_scripts/gha.sh  
+          chmod +x ci_scripts/gha.sh
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
