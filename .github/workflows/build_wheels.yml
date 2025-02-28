@@ -22,6 +22,11 @@ on:
         description: "The PR number or SHA if wanting to build against a PR/SHA in the C++ SDK"
         required: false
         type: string
+      build_config:
+        description: "JSON formatted object representing various build system input parameters."
+        required: false
+        default: ""
+        type: string
 
 env:
   PROJECT_TYPE: "OPERATIONAL"
@@ -29,7 +34,7 @@ env:
   PYTHON_VERSIONS: "3.9,3.10,3.11,3.12,3.13"
   X86_64_PLATFORMS: "manylinux2014,musllinux_1_1,macosx,win"
   ARM64_PLATFORMS: "manylinux2014,macosx"
-  CI_SCRIPTS_URL: "https://raw.githubusercontent.com/thejcfactor/ci_testing/main/ci"
+  CI_SCRIPTS_URL: "https://raw.githubusercontent.com/thejcfactor/ci_testing/main/ci_scripts"
 
 jobs:
   ci-scripts:
@@ -40,8 +45,8 @@ jobs:
           mkdir ci_scripts
           cd ci_scripts
           curl -o gha.sh ${CI_SCRIPTS_URL}/gha.sh
+          curl -o pygha.py ${CI_SCRIPTS_URL}/pygha.py
           ls -alh
-          cat gha.sh
       - name: Upload CI scripts
         uses: actions/upload-artifact@v4
         with:
@@ -58,6 +63,7 @@ jobs:
       INPUT_SHA: ${{ inputs.sha }}
       INPUT_VERSION: ${{ inputs.version }}
       INPUT_CXX_CHANGE: ${{ inputs.cxx_change }}
+      INPUT_BUILD_CONFIG: ${{ inputs.build_config }}
     steps:
       - name: Download CI scripts
         uses: actions/download-artifact@v4
@@ -78,7 +84,7 @@ jobs:
 
   lint:
     runs-on: ubuntu-22.04
-    needs: ci-scripts
+    needs: validate-input
     env:
       INPUT_VERSION: ${{ inputs.version }}
     steps:
@@ -101,3 +107,45 @@ jobs:
         run: |
           ls -alh
           ./ci_scripts/gha.sh lint
+
+  sdist:
+    runs-on: ubuntu-22.04
+    needs: lint
+    env:
+      INPUT_VERSION: ${{ inputs.version }}
+      INPUT_CXX_CHANGE: ${{ inputs.cxx_change }}
+      INPUT_BUILD_CONFIG: ${{ inputs.build_config }}
+    outputs:
+      sdist_name: ${{ steps.create_sdist.outputs.sdist_name }}
+    steps:
+      - name: Checkout (with SHA)
+        if: inputs.sha != ''
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.sha }}
+          submodules: recursive
+          fetch-depth: 0
+          fetch-tags: true
+      - name: Checkout (no SHA)
+        if: inputs.sha == ''
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+          fetch-tags: true
+      - name: Download CI scripts
+        uses: actions/download-artifact@v4
+        with:
+          name: ci_scripts
+          path: ci_scripts
+      - name: Enable CI Scripts
+        run: |
+          chmod +x ci_scripts/gha.sh  
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.DEFAULT_PYTHON }}
+      - name: Confirm Python version
+        run: python -c "import sys; print(sys.version)"
+      - name: Create sdist
+        run: ./ci_scripts/gha.sh sdist
