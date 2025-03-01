@@ -129,9 +129,18 @@ jobs:
     runs-on: ubuntu-22.04
     needs: setup
     steps:
-      - name: Confirm stage matrices
+      - name: Linux Build Wheels Stage
+        if: ${{ fromJson(needs.setup.outputs.stage_matrices).build_wheels.has_linux }}
         run: |
-          echo "${{ fromJson(needs.setup.outputs.stage_matrices).build_wheels }}"
+          echo "${{ toJson(fromJson(needs.setup.outputs.stage_matrices).build_wheels.linux) }}"
+      - name: Macos Build Wheels Stage
+        if: ${{ fromJson(needs.setup.outputs.stage_matrices).build_wheels.has_macos }}
+        run: |
+          echo "${{ toJson(fromJson(needs.setup.outputs.stage_matrices).build_wheels.macos) }}"
+      - name: Windows Build Wheels Stage
+        if: ${{ fromJson(needs.setup.outputs.stage_matrices).build_wheels.has_windows }}
+        run: |
+          echo "${{ toJson(fromJson(needs.setup.outputs.stage_matrices).build_wheels.windows) }}"
 
   # lint:
   #   runs-on: ubuntu-22.04
