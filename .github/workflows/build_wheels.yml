@@ -22,18 +22,25 @@ on:
         description: "The PR number or SHA if wanting to build against a PR/SHA in the C++ SDK"
         required: false
         type: string
-      build_config:
+      config:
         description: "JSON formatted object representing various build system input parameters."
         required: false
         default: ""
         type: string
 
 env:
-  PROJECT_TYPE: "OPERATIONAL"
-  DEFAULT_PYTHON: "3.9"
-  PYTHON_VERSIONS: "3.9,3.10,3.11,3.12,3.13"
-  X86_64_PLATFORMS: "manylinux2014,musllinux_1_1,macosx,win"
-  ARM64_PLATFORMS: "manylinux2014,macosx"
+  CBCI_PROJECT_TYPE: "OPERATIONAL"
+  CBCI_DEFAULT_PYTHON: "3.9"
+  CBCI_SUPPORTED_PYTHON_VERSIONS: "3.9 3.10 3.11 3.12 3.13"
+  CBCI_SUPPORTED_X86_64_PLATFORMS: "linux alpine macos windows"
+  CBCI_SUPPORTED_ARM64_PLATFORMS: "linux macos"
+  CBCI_DEFAULT_LINUX_PLATFORM: "ubuntu-22.04"
+  CBCI_DEFAULT_MACOS_X86_64_PLATFORM: "macos-13"
+  CBCI_DEFAULT_MACOS_ARM64_PLATFORM: "macos-14"
+  CBCI_DEFAULT_WINDOWS_PLATFORM: "windows-2022"
+  CBCI_DEFAULT_LINUX_CONTAINER: "slim-bookworm"
+  CBCI_DEFAULT_ALPINE_CONTAINER: "alpine-3.19"
+  
   CI_SCRIPTS_URL: "https://raw.githubusercontent.com/thejcfactor/ci_testing/main/ci_scripts"
 
 jobs:
@@ -59,11 +66,11 @@ jobs:
     runs-on: ubuntu-22.04
     needs: ci-scripts
     env:
-      INPUT_IS_RELEASE: ${{ inputs.is_release }}
-      INPUT_SHA: ${{ inputs.sha }}
-      INPUT_VERSION: ${{ inputs.version }}
-      INPUT_CXX_CHANGE: ${{ inputs.cxx_change }}
-      INPUT_BUILD_CONFIG: ${{ inputs.build_config }}
+      CBCI_IS_RELEASE: ${{ inputs.is_release }}
+      CBCI_SHA: ${{ inputs.sha }}
+      CBCI_VERSION: ${{ inputs.version }}
+      CBCI_CXX_CHANGE: ${{ inputs.cxx_change }}
+      CBCI_CONFIG: ${{ inputs.config }}
     steps:
       - name: Download CI scripts
         uses: actions/download-artifact@v4
@@ -82,11 +89,13 @@ jobs:
         run: |
           ./ci_scripts/gha.sh validate_input ${{ github.workflow }}
 
-  lint:
+  setup:
     runs-on: ubuntu-22.04
     needs: validate-input
     env:
-      INPUT_VERSION: ${{ inputs.version }}
+      CBCI_CONFIG: ${{ inputs.config }}
+    outputs:
+      stage_matrices: ${{ steps.build_matrices.outputs.stage_matrices }}
     steps:
       - uses: actions/checkout@v4
       - name: Download CI scripts
@@ -97,65 +106,107 @@ jobs:
       - name: Enable CI Scripts
         run: |
           chmod +x ci_scripts/gha.sh
-      - name: Setup Python ${{ env.DEFAULT_PYTHON }}
+      - name: Setup Python ${{ env.CBCI_DEFAULT_PYTHON }}
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ env.DEFAULT_PYTHON }}
+          python-version: ${{ env.CBCI_DEFAULT_PYTHON }}
       - name: Confirm Python version
         run: python -c "import sys; print(sys.version)"
-      - name: Execute linting
+      - name: Build stage matrices
+        id: build_matrices
         run: |
-          ls -alh
-          ./ci_scripts/gha.sh lint
-
-  sdist:
-    runs-on: ubuntu-22.04
-    needs: lint
-    env:
-      INPUT_VERSION: ${{ inputs.version }}
-      INPUT_CXX_CHANGE: ${{ inputs.cxx_change }}
-      INPUT_BUILD_CONFIG: ${{ inputs.build_config }}
-    outputs:
-      sdist_name: ${{ steps.create_sdist.outputs.sdist_name }}
-    steps:
-      - name: Checkout (with SHA)
-        if: inputs.sha != ''
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ inputs.sha }}
-          submodules: recursive
-          fetch-depth: 0
-          fetch-tags: true
-      - name: Checkout (no SHA)
-        if: inputs.sha == ''
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
-          fetch-depth: 0
-          fetch-tags: true
-      - name: Download CI scripts
-        uses: actions/download-artifact@v4
-        with:
-          name: ci_scripts
-          path: ci_scripts
-      - name: Enable CI Scripts
-        run: |
-          chmod +x ci_scripts/gha.sh
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.DEFAULT_PYTHON }}
-      - name: Confirm Python version
-        run: python -c "import sys; print(sys.version)"
-      - name: Create sdist
-        id: create_sdist
-        run: |
-          ./ci_scripts/gha.sh sdist
           exit_code=0
-          sdist_name=$(./ci_scripts/gha.sh get_sdist_name) || exit_code=$?
+          STAGE_MATRICES=$(./ci_scripts/gha.sh get_stage_matrices) || exit_code=$?
           if [ $exit_code -ne 0 ]; then
             echo "Failed to obtain sdist name."
             exit 1
           fi
-          echo "SDIST_NAME=$sdist_name"
-          echo "sdist_name=$sdist_name" >> "$GITHUB_OUTPUT"
+          stage_matrices_json=$(jq -cn --argjson matrices "$STAGE_MATRICES" '$matrices')
+          echo "STAGE_MATRICE_JSON=$stage_matrices_json"
+          echo "stage_matrices=$stage_matrices_json" >> "$GITHUB_OUTPUT"
+
+  confirm-matrices:
+    runs-on: ubuntu-22.04
+    needs: setup
+    steps:
+      - name: Confirm stage matrices
+        run: |
+          echo "${{ fromJson(needs.setup.outputs.stage_matrices).build_wheels }}"
+
+  # lint:
+  #   runs-on: ubuntu-22.04
+  #   needs: validate-input
+  #   env:
+  #     CBCI_VERSION: ${{ inputs.version }}
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - name: Download CI scripts
+  #       uses: actions/download-artifact@v4
+  #       with:
+  #         name: ci_scripts
+  #         path: ci_scripts
+  #     - name: Enable CI Scripts
+  #       run: |
+  #         chmod +x ci_scripts/gha.sh
+  #     - name: Setup Python ${{ env.CBCI_DEFAULT_PYTHON }}
+  #       uses: actions/setup-python@v5
+  #       with:
+  #         python-version: ${{ env.CBCI_DEFAULT_PYTHON }}
+  #     - name: Confirm Python version
+  #       run: python -c "import sys; print(sys.version)"
+  #     - name: Execute linting
+  #       run: |
+  #         ls -alh
+  #         ./ci_scripts/gha.sh lint
+
+  # sdist:
+  #   runs-on: ubuntu-22.04
+  #   needs: lint
+  #   env:
+  #     CBCI_VERSION: ${{ inputs.version }}
+  #     CBCI_CXX_CHANGE: ${{ inputs.cxx_change }}
+  #     CBCI_CONFIG: ${{ inputs.config }}
+  #   outputs:
+  #     sdist_name: ${{ steps.create_sdist.outputs.sdist_name }}
+  #   steps:
+  #     - name: Checkout (with SHA)
+  #       if: inputs.sha != ''
+  #       uses: actions/checkout@v4
+  #       with:
+  #         ref: ${{ inputs.sha }}
+  #         submodules: recursive
+  #         fetch-depth: 0
+  #         fetch-tags: true
+  #     - name: Checkout (no SHA)
+  #       if: inputs.sha == ''
+  #       uses: actions/checkout@v4
+  #       with:
+  #         submodules: recursive
+  #         fetch-depth: 0
+  #         fetch-tags: true
+  #     - name: Download CI scripts
+  #       uses: actions/download-artifact@v4
+  #       with:
+  #         name: ci_scripts
+  #         path: ci_scripts
+  #     - name: Enable CI Scripts
+  #       run: |
+  #         chmod +x ci_scripts/gha.sh
+  #     - name: Setup Python
+  #       uses: actions/setup-python@v5
+  #       with:
+  #         python-version: ${{ env.CBCI_DEFAULT_PYTHON }}
+  #     - name: Confirm Python version
+  #       run: python -c "import sys; print(sys.version)"
+  #     - name: Create sdist
+  #       id: create_sdist
+  #       run: |
+  #         ./ci_scripts/gha.sh sdist
+  #         exit_code=0
+  #         sdist_name=$(./ci_scripts/gha.sh get_sdist_name) || exit_code=$?
+  #         if [ $exit_code -ne 0 ]; then
+  #           echo "Failed to obtain sdist name."
+  #           exit 1
+  #         fi
+  #         echo "SDIST_NAME=$sdist_name"
+  #         echo "sdist_name=$sdist_name" >> "$GITHUB_OUTPUT"
