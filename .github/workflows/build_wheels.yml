@@ -268,7 +268,7 @@ jobs:
       - name: Run in docker
         uses: addnab/docker-run-action@v3
         with:
-          image: jacasey/pycbc_${{ matrix.linux-type == 'manylinux' && 'manylinux2014' || 'musllinux_1_1' }}_${{ matrix.arch }}:1.0.1
+          image: jacasey/pycbc_${{ matrix.linux-type == 'manylinux' && 'manylinux2014' || 'musllinux_1_1' }}_${{ matrix.arch }}:1.0.2
           options: >-
             --platform linux/${{ matrix.arch == 'aarch64' && 'arm64' || 'amd64'}}
             -v ${{ github.workspace }}:/work
