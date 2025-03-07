@@ -279,7 +279,6 @@ jobs:
             -e WHEEL_PLATFORM=${{ matrix.linux-type == 'manylinux' && 'manylinux2014' || 'musllinux_1_1' }}_${{ matrix.arch }}
             -e SDIST_NAME=${{ needs.sdist.outputs.sdist_name }}
             -e PYTHON_VERSIONS=${{ matrix.python-version }}
-            -e CBCI_CONFIG=${{ env.CBCI_CONFIG }}
             -e PREFER_CCACHE=/work/.ccache
             -e PREFER_VERBOSE_MAKEFILE=ON
           run: |
@@ -346,6 +345,7 @@ jobs:
         env:
           PREFER_VERBOSE_MAKEFILE: ON
           PREFER_CCACHE: ${{ github.workspace }}/.ccache
+          SDIST_NAME: ${{ needs.sdist.outputs.sdist_name }}
           MACOSX_DEPLOYMENT_TARGET: ${{ matrix.cibw_archs == 'arm64' && '11.0' || '10.15' }}
           ARCHFLAGS: "${{ matrix.arch == 'arm64' && '-arch arm64' || '-arch x86_64' }}"
           CMAKE_OSX_ARCHITECTURES: ${{ matrix.arch == 'arm64' && 'arm64' || 'x86_64' }}
