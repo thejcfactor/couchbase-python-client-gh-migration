@@ -282,7 +282,7 @@ jobs:
             -e PREFER_CCACHE=/work/.ccache
             -e PREFER_VERBOSE_MAKEFILE=ON
             -e CBCI_PROJECT_TYPE=${{ env.CBCI_PROJECT_TYPE }}
-            -e CBCI_CONFIG="${{ env.CBCI_CONFIG }}"
+            -e "CBCI_CONFIG=${{ env.CBCI_CONFIG }}"
           run: |
             cd /work
             ls -alh
