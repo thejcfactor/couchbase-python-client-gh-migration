@@ -198,6 +198,10 @@ class CMakeConfig:
             elif user_defined_download_mozilla == '-DDOWNLOAD_MOZILLA_CA_BUNDLE:BOOL=OFF':
                 cmake_config_args.append(f'-DCOUCHBASE_CXX_CLIENT_EMBED_MOZILLA_CA_BUNDLE_ROOT={CXXCBC_CACHE_DIR}')
 
+        cb_cache_option = env.pop('PYCBC_CB_CACHE_OPTION', None)
+        if cb_cache_option is not None:
+            cmake_config_args.append(f'-DCACHE_OPTION={cb_cache_option}')
+
         if platform.system() == "Windows":
             cmake_config_args += [f'-DCMAKE_RUNTIME_OUTPUT_DIRECTORY_{build_type.upper()}={output_dir}']
 

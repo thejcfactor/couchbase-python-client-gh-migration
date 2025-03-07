@@ -40,7 +40,6 @@ env:
   CBCI_DEFAULT_WINDOWS_PLATFORM: "windows-2022"
   CBCI_DEFAULT_LINUX_CONTAINER: "slim-bookworm"
   CBCI_DEFAULT_ALPINE_CONTAINER: "alpine-3.19"
-  
   CI_SCRIPTS_URL: "https://raw.githubusercontent.com/thejcfactor/ci_testing/main/ci_scripts"
 
 jobs:
@@ -53,6 +52,7 @@ jobs:
           cd ci_scripts
           curl -o gha.sh ${CI_SCRIPTS_URL}/gha.sh
           curl -o pygha.py ${CI_SCRIPTS_URL}/pygha.py
+          curl -o auditwheel_patch ${CI_SCRIPTS_URL}/auditwheel_patch
           ls -alh
       - name: Upload CI scripts
         uses: actions/upload-artifact@v4
@@ -122,7 +122,7 @@ jobs:
             exit 1
           fi
           stage_matrices_json=$(jq -cn --argjson matrices "$STAGE_MATRICES" '$matrices')
-          echo "STAGE_MATRICE_JSON=$stage_matrices_json"
+          echo "STAGE_MATRICES_JSON=$stage_matrices_json"
           echo "stage_matrices=$stage_matrices_json" >> "$GITHUB_OUTPUT"
 
   confirm-matrices:
@@ -142,95 +142,225 @@ jobs:
         run: |
           echo "${{ toJson(fromJson(needs.setup.outputs.stage_matrices).build_wheels.windows) }}"
 
+
+  lint:
+    runs-on: ubuntu-22.04
+    needs: validate-input
+    env:
+      CBCI_VERSION: ${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download CI scripts
+        uses: actions/download-artifact@v4
+        with:
+          name: ci_scripts
+          path: ci_scripts
+      - name: Enable CI Scripts
+        run: |
+          chmod +x ci_scripts/gha.sh
+      - name: Setup Python ${{ env.CBCI_DEFAULT_PYTHON }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.CBCI_DEFAULT_PYTHON }}
+      - name: Confirm Python version
+        run: python -c "import sys; print(sys.version)"
+      - name: Execute linting
+        run: |
+          ls -alh
+          ./ci_scripts/gha.sh lint
+
+  sdist:
+    runs-on: ubuntu-22.04
+    needs: lint
+    env:
+      CBCI_VERSION: ${{ inputs.version }}
+      CBCI_CXX_CHANGE: ${{ inputs.cxx_change }}
+      CBCI_CONFIG: ${{ inputs.config }}
+    outputs:
+      sdist_name: ${{ steps.create_sdist.outputs.sdist_name }}
+    steps:
+      - name: Checkout (with SHA)
+        if: inputs.sha != ''
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.sha }}
+          submodules: recursive
+          fetch-depth: 0
+          fetch-tags: true
+      - name: Checkout (no SHA)
+        if: inputs.sha == ''
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+          fetch-tags: true
+      - name: Download CI scripts
+        uses: actions/download-artifact@v4
+        with:
+          name: ci_scripts
+          path: ci_scripts
+      - name: Enable CI Scripts
+        run: |
+          chmod +x ci_scripts/gha.sh
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.CBCI_DEFAULT_PYTHON }}
+      - name: Confirm Python version
+        run: python -c "import sys; print(sys.version)"
+      - name: Create sdist
+        id: create_sdist
+        run: |
+          ./ci_scripts/gha.sh sdist
+          exit_code=0
+          sdist_name=$(./ci_scripts/gha.sh get_sdist_name) || exit_code=$?
+          if [ $exit_code -ne 0 ]; then
+            echo "Failed to obtain sdist name."
+            exit 1
+          fi
+          echo "SDIST_NAME=$sdist_name"
+          echo "sdist_name=$sdist_name" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        with:
+          retention-days: 1
+          name: pycbc-artifact-sdist
+          path: |
+            ./dist/*.tar.gz
+
   linux-wheels:
-    needs: setup
+    needs: [setup, sdist]
     if: ${{ fromJson(needs.setup.outputs.stage_matrices).build_wheels.has_linux }}
     name: Build Python ${{ matrix.python-version }} ${{ matrix.linux-type }} wheel (${{ matrix.arch }})
     runs-on: ubuntu-22.04
+    env:
+      CBCI_CONFIG: ${{ inputs.config }}
     strategy:
       fail-fast: true
       matrix: ${{ fromJson(needs.setup.outputs.stage_matrices).build_wheels.linux }}
     steps:
-      - name: Say Hello
+      - name: Download CI scripts
+        uses: actions/download-artifact@v4
+        with:
+          name: ci_scripts
+          path: ci_scripts
+      - name: Enable CI Scripts
         run: |
-          echo "Hello"
-          image=jacasey/pycbc_${{ matrix.linux-type == 'manylinux' && 'manylinux2014' || 'musllinux_1_1' }}_${{ matrix.arch }}:1.0.1
-          echo "Image: $image"
+          chmod +x ci_scripts/gha.sh
+      - name: Download sdist
+        uses: actions/download-artifact@v4
+        with:
+          name: pycbc-artifact-sdist
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Confirm Python version
+        run: python -c "import sys; print(sys.version)"
+      - name: Set up QEMU
+        if: ${{ matrix.arch == 'aarch64' }}
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+      - name: ccache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: ${{ github.job }}-${{ matrix.linux-type }}-${{ matrix.arch }}-python${{ matrix.python-version }}
+      - name: Run in docker
+        uses: addnab/docker-run-action@v3
+        with:
+          image: jacasey/pycbc_${{ matrix.linux-type == 'manylinux' && 'manylinux2014' || 'musllinux_1_1' }}_${{ matrix.arch }}:1.0.1
+          options: >-
+            --platform linux/${{ matrix.arch == 'aarch64' && 'arm64' || 'amd64'}}
+            -v ${{ github.workspace }}:/work
+            -e PYTHON_SDK_WORKDIR=/work
+            -e PYTHON_SDK_WHEELHOUSE=/work/wheelhouse/dist
+            -e PYTHON_SDK_DEBUG_WHEELHOUSE=/work/wheelhouse/dist_debug
+            -e AUDITWHEEL=/work/ci_scripts/auditwheel_patch
+            -e WHEEL_PLATFORM=${{ matrix.linux-type == 'manylinux' && 'manylinux2014' || 'musllinux_1_1' }}_${{ matrix.arch }}
+            -e SDIST_NAME=${{ needs.sdist.outputs.sdist_name }}
+            -e PYTHON_VERSIONS=${{ matrix.python-version }}
+            -e CBCI_CONFIG=${{ env.CBCI_CONFIG }}
+            -e PREFER_CCACHE=/work/.ccache
+            -e PREFER_VERBOSE_MAKEFILE=ON
+          run: |
+            cd /work
+            ls -alh
+            env
+            ./ci_scripts/gha.sh wheel
+      - name: Upload Python ${{ matrix.python-version }} wheel
+        uses: actions/upload-artifact@v4
+        with:
+          retention-days: 1
+          name: ${{ matrix.linux-type }}-${{ matrix.arch }}-python${{ matrix.python-version }}-wheel
+          path: |
+            wheelhouse/dist/*.whl
+      - name: Upload Python ${{ matrix.python-version }} debug wheel as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          retention-days: 1
+          name: pycbcc-debug-artifact-${{ matrix.linux-type }}-${{ matrix.arch }}-python${{ matrix.python-version }}-wheel
+          path: |
+            wheelhouse/dist_debug/*.whl
 
-  # lint:
-  #   runs-on: ubuntu-22.04
-  #   needs: validate-input
-  #   env:
-  #     CBCI_VERSION: ${{ inputs.version }}
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - name: Download CI scripts
-  #       uses: actions/download-artifact@v4
-  #       with:
-  #         name: ci_scripts
-  #         path: ci_scripts
-  #     - name: Enable CI Scripts
-  #       run: |
-  #         chmod +x ci_scripts/gha.sh
-  #     - name: Setup Python ${{ env.CBCI_DEFAULT_PYTHON }}
-  #       uses: actions/setup-python@v5
-  #       with:
-  #         python-version: ${{ env.CBCI_DEFAULT_PYTHON }}
-  #     - name: Confirm Python version
-  #       run: python -c "import sys; print(sys.version)"
-  #     - name: Execute linting
-  #       run: |
-  #         ls -alh
-  #         ./ci_scripts/gha.sh lint
-
-  # sdist:
-  #   runs-on: ubuntu-22.04
-  #   needs: lint
-  #   env:
-  #     CBCI_VERSION: ${{ inputs.version }}
-  #     CBCI_CXX_CHANGE: ${{ inputs.cxx_change }}
-  #     CBCI_CONFIG: ${{ inputs.config }}
-  #   outputs:
-  #     sdist_name: ${{ steps.create_sdist.outputs.sdist_name }}
-  #   steps:
-  #     - name: Checkout (with SHA)
-  #       if: inputs.sha != ''
-  #       uses: actions/checkout@v4
-  #       with:
-  #         ref: ${{ inputs.sha }}
-  #         submodules: recursive
-  #         fetch-depth: 0
-  #         fetch-tags: true
-  #     - name: Checkout (no SHA)
-  #       if: inputs.sha == ''
-  #       uses: actions/checkout@v4
-  #       with:
-  #         submodules: recursive
-  #         fetch-depth: 0
-  #         fetch-tags: true
-  #     - name: Download CI scripts
-  #       uses: actions/download-artifact@v4
-  #       with:
-  #         name: ci_scripts
-  #         path: ci_scripts
-  #     - name: Enable CI Scripts
-  #       run: |
-  #         chmod +x ci_scripts/gha.sh
-  #     - name: Setup Python
-  #       uses: actions/setup-python@v5
-  #       with:
-  #         python-version: ${{ env.CBCI_DEFAULT_PYTHON }}
-  #     - name: Confirm Python version
-  #       run: python -c "import sys; print(sys.version)"
-  #     - name: Create sdist
-  #       id: create_sdist
-  #       run: |
-  #         ./ci_scripts/gha.sh sdist
-  #         exit_code=0
-  #         sdist_name=$(./ci_scripts/gha.sh get_sdist_name) || exit_code=$?
-  #         if [ $exit_code -ne 0 ]; then
-  #           echo "Failed to obtain sdist name."
-  #           exit 1
-  #         fi
-  #         echo "SDIST_NAME=$sdist_name"
-  #         echo "sdist_name=$sdist_name" >> "$GITHUB_OUTPUT"
+  macos-wheels:
+    needs: [setup, sdist]
+    if: ${{ fromJson(needs.setup.outputs.stage_matrices).build_wheels.has_macos }}
+    name: Build Python ${{ matrix.python-version }} macos wheel on ${{ matrix.arch }}
+    runs-on: ${{ matrix.os }}
+    env:
+      CBCI_CONFIG: ${{ inputs.config }}
+    strategy:
+      fail-fast: true
+      matrix: ${{ fromJson(needs.setup.outputs.stage_matrices).build_wheels.macos }}
+    steps:
+      - name: Download CI scripts
+        uses: actions/download-artifact@v4
+        with:
+          name: ci_scripts
+          path: ci_scripts
+      - name: Enable CI Scripts
+        run: |
+          chmod +x ci_scripts/gha.sh
+      - name: Download sdist
+        uses: actions/download-artifact@v4
+        with:
+          name: pycbc-artifact-sdist
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Confirm Python version
+        run: python -c "import sys; print(sys.version)"
+      - name: Install ccache
+        run: |
+          brew install ccache
+      - name: ccache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: ${{ github.job }}-${{ matrix.os }}-${{ matrix.arch }}-python${{ matrix.python-version }}
+      - name: Build wheel ${{ matrix.arch }}
+        run: |
+          ls -alh
+          env
+          ./ci_scripts/gha.sh wheel ${{ matrix.arch }}
+        env:
+          PREFER_VERBOSE_MAKEFILE: ON
+          PREFER_CCACHE: ${{ github.workspace }}/.ccache
+          MACOSX_DEPLOYMENT_TARGET: ${{ matrix.cibw_archs == 'arm64' && '11.0' || '10.15' }}
+          ARCHFLAGS: "${{ matrix.arch == 'arm64' && '-arch arm64' || '-arch x86_64' }}"
+          CMAKE_OSX_ARCHITECTURES: ${{ matrix.arch == 'arm64' && 'arm64' || 'x86_64' }}
+          _PYTHON_HOST_PLATFORM: ${{ matrix.arch == 'arm64' && 'macosx-11-arm64' || 'macosx-10.15-x86_64' }}
+      - name: Upload Python ${{ matrix.python-version }} wheel
+        uses: actions/upload-artifact@v4
+        with:
+          retention-days: 1
+          name: macos-${{ matrix.arch }}-python${{ matrix.python-version }}-wheel
+          path: |
+            wheelhouse/dist/*.whl
+      - name: Upload Python ${{ matrix.python-version }} debug wheel as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          retention-days: 1
+          name: pycbcc-debug-artifact-macos-${{ matrix.arch }}-python${{ matrix.python-version }}-wheel
+          path: |
+            wheelhouse/dist_debug/*.whl
