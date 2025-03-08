@@ -282,7 +282,7 @@ jobs:
             -e PREFER_CCACHE=/work/.ccache
             -e PREFER_VERBOSE_MAKEFILE=ON
             -e CBCI_PROJECT_TYPE=${{ env.CBCI_PROJECT_TYPE }}
-            -e "CBCI_CONFIG=${{ inputs.config }}"
+            -e CBCI_CONFIG=${{ inputs.config }}
             -e ARCH=${{ matrix.arch }}
             -e CBCI_DEFAULT_PYTHON=${{ env.CBCI_DEFAULT_PYTHON }}
             -e CURRENT_PYTHON_VERSION=${{ matrix.python-version }}
