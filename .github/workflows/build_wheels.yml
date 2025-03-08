@@ -283,11 +283,17 @@ jobs:
             -e PREFER_VERBOSE_MAKEFILE=ON
             -e CBCI_PROJECT_TYPE=${{ env.CBCI_PROJECT_TYPE }}
             -e "CBCI_CONFIG=${{ env.CBCI_CONFIG }}"
+            -e ARCH=${{ matrix.arch }}
+            -e CBCI_DEFAULT_PYTHON=${{ env.CBCI_DEFAULT_PYTHON }}
+            -e CURRENT_PYTHON_VERSION=${{ matrix.python-version }}
           run: |
             cd /work
             ls -alh
             env
             ./ci_scripts/gha.sh wheel
+            if [[ "$ARCH" == "x86_64" && "$CURRENT_PYTHON_VERSION" == $CBCI_DEFAULT_PYTHON ]]; then
+              ./ci_scripts/gha.sh save_shared_obj wheelhouse/dist so_output
+            fi
       - name: Upload Python ${{ matrix.python-version }} wheel
         uses: actions/upload-artifact@v4
         with:
@@ -302,10 +308,10 @@ jobs:
           name: pycbc-debug-artifact-${{ matrix.linux-type }}-${{ matrix.arch }}-python${{ matrix.python-version }}-wheel
           path: |
             wheelhouse/dist_debug/*.whl
-      - name: Save shared object
-        if: ${{ matrix.python-version == env.CBCI_DEFAULT_PYTHON && matrix.arch == 'x86_64' }}
-        run: |
-          ./ci_scripts/gha.sh save_shared_obj wheelhouse/dist so_output
+      # - name: Save shared object
+      #   if: ${{ matrix.python-version == env.CBCI_DEFAULT_PYTHON && matrix.arch == 'x86_64' }}
+      #   run: |
+      #     ./ci_scripts/gha.sh save_shared_obj wheelhouse/dist so_output
       - name: Upload Python ${{ env.DEFAULT_PYTHON }} x86_64 shared object
         if: ${{ matrix.python-version == env.CBCI_DEFAULT_PYTHON && matrix.arch == 'x86_64' }}
         uses: actions/upload-artifact@v4
