@@ -292,7 +292,7 @@ jobs:
             ls -alh
             env
             ./ci_scripts/gha.sh wheel
-            if [[ "$ARCH" == "x86_64" && "$CURRENT_PYTHON_VERSION" == $CBCI_DEFAULT_PYTHON && "$LINUX_TYPE" != "musllinux"]]; then
+            if [[ "$ARCH" == "x86_64" && "$CURRENT_PYTHON_VERSION" == $CBCI_DEFAULT_PYTHON && "$LINUX_TYPE" == "manylinux" ]]; then
               ./ci_scripts/gha.sh save_shared_obj wheelhouse/dist so_output
             fi
       - name: Upload Python ${{ matrix.python-version }} wheel
