@@ -313,12 +313,12 @@ jobs:
       #   if: ${{ matrix.python-version == env.CBCI_DEFAULT_PYTHON && matrix.arch == 'x86_64' }}
       #   run: |
       #     ./ci_scripts/gha.sh save_shared_obj wheelhouse/dist so_output
-      - name: Upload Python ${{ env.DEFAULT_PYTHON }} x86_64 shared object
+      - name: Upload Python ${{ env.CBCI_DEFAULT_PYTHON }} x86_64 shared object
         if: ${{ matrix.python-version == env.CBCI_DEFAULT_PYTHON && matrix.arch == 'x86_64' }}
         uses: actions/upload-artifact@v4
         with:
           retention-days: 1
-          name: manylinux-x86_64-python${{ env.DEFAULT_PYTHON }}-shared-object
+          name: manylinux-x86_64-python${{ env.CBCI_DEFAULT_PYTHON }}-shared-object
           path: |
             so_output/pycbc_core.so
 
