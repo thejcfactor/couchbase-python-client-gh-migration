@@ -284,6 +284,7 @@ jobs:
             -e CBCI_PROJECT_TYPE=${{ env.CBCI_PROJECT_TYPE }}
             -e CBCI_CONFIG=${{ inputs.config }}
             -e ARCH=${{ matrix.arch }}
+            -e LINUX_TYPE=${{ matrix.linux-type }}
             -e CBCI_DEFAULT_PYTHON=${{ env.CBCI_DEFAULT_PYTHON }}
             -e CURRENT_PYTHON_VERSION=${{ matrix.python-version }}
           run: |
@@ -291,7 +292,7 @@ jobs:
             ls -alh
             env
             ./ci_scripts/gha.sh wheel
-            if [[ "$ARCH" == "x86_64" && "$CURRENT_PYTHON_VERSION" == $CBCI_DEFAULT_PYTHON && ${{ matrix.linux-type }} != "musllinux"]]; then
+            if [[ "$ARCH" == "x86_64" && "$CURRENT_PYTHON_VERSION" == $CBCI_DEFAULT_PYTHON && "$LINUX_TYPE" != "musllinux"]]; then
               ./ci_scripts/gha.sh save_shared_obj wheelhouse/dist so_output
             fi
       - name: Upload Python ${{ matrix.python-version }} wheel
